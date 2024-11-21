@@ -9,6 +9,8 @@ pub struct PublicValuesStruct {
 
 #[derive(Debug)]
 pub enum MerkleError {
+    EmptyLeaves,
+    InvalidIndex,
     BadMerkleProof,
 }
 

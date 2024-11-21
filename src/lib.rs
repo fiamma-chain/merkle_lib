@@ -97,4 +97,18 @@ mod tests {
         println!("root: {:?}", root);
         assert_eq!(root, input.root);
     }
+
+    #[test]
+    fn test_hash() {
+        let left = "479dab8ccf7d2603386dddf9625d9c20c6d49cf9d7302ef0ade1e446625cb7ec";
+        let right = "c3b2a2741892a2a30a1579fd66fabe157ea1eb7bebd006ad9061adf2a1a8cde2";
+
+        let mut left = hex::decode(left).unwrap();
+        let mut right = hex::decode(right).unwrap();
+        left.reverse();
+        right.reverse();
+
+        let hash = hash256_merkle_step(&left, &right);
+        println!("hash: {}", hex::encode(hash));
+    }
 }

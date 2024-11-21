@@ -1,52 +1,63 @@
-use crate::types::{MerkleArray, MerkleInput};
+use crate::{
+    merkle_root,
+    types::{MerkleArray, MerkleError, MerkleInput},
+};
 
-pub fn create_merkle_input(leaves: &MerkleArray, index: usize) -> MerkleInput {
-    let mut siblings = Vec::new();
-    let mut current_level = (0..leaves.len())
+pub fn create_merkle_input(leaves: &MerkleArray, index: usize) -> Result<MerkleInput, MerkleError> {
+    let siblings = get_merkle_proof(leaves, index)?;
+    let leaf = leaves.index(index);
+    let root = merkle_root(&leaf, index as u32, &siblings);
+    Ok(MerkleInput {
+        txid: leaf,
+        index: index as u32,
+        siblings,
+        root,
+    })
+}
+
+pub fn get_merkle_proof(leaves: &MerkleArray, index: usize) -> Result<MerkleArray, MerkleError> {
+    let tx_len = leaves.len();
+    if tx_len == 0 {
+        return Err(MerkleError::EmptyLeaves);
+    }
+    if tx_len == 1 {
+        return Ok(MerkleArray::new(&[]).unwrap());
+    }
+    if index >= tx_len {
+        return Err(MerkleError::InvalidIndex);
+    }
+    let mut layers = Vec::new();
+    let mut proof = Vec::new();
+    let layer = (0..leaves.len())
         .map(|i| leaves.index(i))
         .collect::<Vec<_>>();
-    let mut current_index = index;
 
-    while current_level.len() > 1 {
-        let mut next_level = Vec::new();
-        let mut i = 0;
-
-        while i < current_level.len() {
-            if i + 1 < current_level.len() {
-                if i / 2 == current_index / 2 {
-                    if current_index % 2 == 0 {
-                        siblings.push(current_level[i + 1]);
-                    } else {
-                        siblings.push(current_level[i]);
-                    }
-                }
-
-                let combined = crate::hash256_merkle_step(&current_level[i], &current_level[i + 1]);
-                next_level.push(combined);
-            } else {
-                next_level.push(current_level[i]);
-            }
-            i += 2;
+    layers.push(layer);
+    let mut current_layer_index = 0;
+    let mut proof_index_in_layer = index;
+    loop {
+        let mut current_layer = layers[current_layer_index].iter();
+        let current_layer_len = current_layer.len();
+        if current_layer_len <= 1 {
+            break;
         }
-
-        current_level = next_level;
-        current_index /= 2;
+        let new_layer_len = current_layer_len / 2 + current_layer_len % 2;
+        let mut new_layer = Vec::with_capacity(new_layer_len);
+        while let Some(hash1) = current_layer.next() {
+            let hash2 = current_layer.next().unwrap_or(hash1);
+            new_layer.push(crate::hash256_merkle_step(hash1, hash2));
+        }
+        layers.push(new_layer);
+        let current_layer = layers[current_layer_index].clone();
+        if proof_index_in_layer % 2 == 0 {
+            proof.push(current_layer[proof_index_in_layer + 1].clone());
+        } else {
+            proof.push(current_layer[proof_index_in_layer - 1].clone());
+        }
+        proof_index_in_layer >>= 1;
+        current_layer_index += 1;
     }
-
-    let root = current_level[0];
-
-    let siblings_bytes: Vec<u8> = siblings
-        .iter()
-        .flat_map(|hash| hash.iter())
-        .cloned()
-        .collect();
-
-    MerkleInput {
-        txid: leaves.index(index),
-        index: index as u32,
-        siblings: MerkleArray::new(&siblings_bytes).unwrap(),
-        root,
-    }
+    MerkleArray::new(&proof.into_flattened())
 }
 
 #[test]
@@ -69,6 +80,6 @@ fn test_create_merkle_input() {
     leaves.extend_from_slice(&right);
 
     let merkle_array = MerkleArray::new(&leaves).unwrap();
-    let merkle_input = create_merkle_input(&merkle_array, 0);
+    let merkle_input = create_merkle_input(&merkle_array, 0).unwrap();
     assert_eq!(merkle_input.root, root);
 }
