@@ -70,8 +70,5 @@ pub struct MerkleInput {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MerklePublicValues {
     pub txid: Hash256Digest,
-    pub index: u32,
-    pub siblings: MerkleArray,
     pub root: Hash256Digest,
-    pub verified: bool,
 }
