@@ -39,6 +39,11 @@ impl MerkleArray {
         self.0.is_empty()
     }
 
+    /// Return the underlying bytes
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.0
+    }
+
     /// Index into the merkle array
     pub fn index(&self, index: usize) -> Hash256Digest {
         let mut digest = Hash256Digest::default();

@@ -111,4 +111,51 @@ mod tests {
         let hash = hash256_merkle_step(&left, &right);
         println!("hash: {}", hex::encode(hash));
     }
+
+    #[test]
+    fn test_merkle_input() {
+        // Get block transactions by [getblock.io](https://getblock.io/docs/btc/json-rpc/btc_getblock/) RPCs.
+        // bitcoin mainnet 116928
+        let txs = [
+            "77a65018ade2ac9ec37e66ba35a9aaffe72f17b0750ed8c6ac746a6d19565454",
+            "c518b7d7a61c800f5e5b182f72edcc8103910fb1254191e509fa6b9aee641a7c",
+            "e9b2080d73bdfed05342a4f2702ce7d5190f83af2f3853a7093ccbf88494780e",
+            "3046341af38ed5918e5ef4883dced8f3d1b4b19d08d02c0172b54530dd316e82",
+            "c1bfd5d56eb8a999127f61987d155988583ef2e55090dd64ad669498510188cf",
+            "6547e46183fa5f4c1e456faad1929b928254dbf484669ae6e58a132bd443f685",
+            "7011a0b02226a565678c938ef574de0869d79aabc78510585207efefce4644b6",
+            "dfefe12432ede593c3c8c6c6d42b044ce01d2e91aef4a073fe455b4d6ca68597",
+            "0fda745581662314a6edf25ed7a3731c63684860e984682567a7ff7e8c82d1cc",
+            "1836289e21127920c5cdb0ad9bf05896690d577c4a4835853fc9d50036bf79e9",
+        ];
+
+        let txs: Vec<[u8; 32]> = txs
+            .iter()
+            .map(|tx| {
+                let mut raw: [u8; 32] = hex::decode(tx).unwrap().try_into().unwrap();
+                raw.reverse();
+                raw
+            })
+            .collect();
+
+        let mut leaves = vec![];
+        for tx in txs {
+            leaves.extend_from_slice(&tx);
+        }
+
+        let index = 0;
+        let leaves = MerkleArray::new(&leaves).unwrap();
+        let merkle_input = input::create_merkle_input(&leaves, index).unwrap();
+        let tx_id_leaf = leaves.index(index);
+        let root = merkle_root(&tx_id_leaf, index as u32, &merkle_input.siblings);
+        // root.reverse();
+        // println!("root: {}", hex::encode(root));
+
+        println!(
+            "proof: {}{}{}",
+            hex::encode(tx_id_leaf),
+            merkle_input.siblings.str(),
+            hex::encode(root)
+        );
+    }
 }
