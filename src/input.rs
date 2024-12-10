@@ -50,7 +50,11 @@ pub fn get_merkle_proof(leaves: &MerkleArray, index: usize) -> Result<MerkleArra
         layers.push(new_layer);
         let current_layer = layers[current_layer_index].clone();
         if proof_index_in_layer % 2 == 0 {
-            proof.push(current_layer[proof_index_in_layer + 1].clone());
+            if proof_index_in_layer + 1 < current_layer.len() {
+                proof.push(current_layer[proof_index_in_layer + 1].clone());
+            } else {
+                proof.push(current_layer[proof_index_in_layer].clone());
+            }
         } else {
             proof.push(current_layer[proof_index_in_layer - 1].clone());
         }
@@ -82,4 +86,56 @@ fn test_create_merkle_input() {
     let merkle_array = MerkleArray::new(&leaves).unwrap();
     let merkle_input = create_merkle_input(&merkle_array, 0).unwrap();
     assert_eq!(merkle_input.root, root);
+}
+
+#[test]
+fn test_odd_txs() {
+    let txs = [
+        "f89c65bdcd695e4acc621256085f20d7c093097e04a1ce34b606a5829cbaf2c6",
+        "1818bef9c6aeed09de0ed999b5f2868b3555084437e1c63f29d5f37b69bb214f",
+        "d43a40a2db5bad2bd176c27911ed86d97bff734425953b19c8cf77910b21020d",
+    ];
+    let root = "34d5a57822efa653019edfee29b9586a0d0d807572275b45f39a7e9c25614bf9";
+
+    test_txs(&txs, &root);
+}
+
+#[test]
+fn test_even_txs() {
+    let txs = [
+        "590e6abd3f7bc242544216061a60a9131e95b1ccea2ec58186d04ce525f1f7d5",
+        "cee36e9c7272a5c464609e398dd1d525ea181c55779ebb9a3c90ce905152f074",
+        "ebe2985f6fa1c1ad96adab05879d1e13f7b50ffc873c960a9c8d600fd91565b4",
+        "4baa10198dd7c351ac7f97602b6b8c5521613b284a580c2acdd17c9513b01d36",
+    ];
+    let root = "c83640427315a008b7ca9670201eab7363211566a7536a8ed446b36af222b338";
+
+    test_txs(&txs, &root);
+}
+
+#[allow(dead_code)]
+fn test_txs(txs: &[&str], expected_root: &str) {
+    let txs: Vec<[u8; 32]> = txs
+        .iter()
+        .map(|tx| {
+            let mut raw: [u8; 32] = hex::decode(tx).unwrap().try_into().unwrap();
+            raw.reverse();
+            raw
+        })
+        .collect();
+
+    let mut leaves = vec![];
+    for tx in txs {
+        leaves.extend_from_slice(&tx);
+    }
+
+    let index = 0;
+    let leaves = MerkleArray::new(&leaves).unwrap();
+    let merkle_input = create_merkle_input(&leaves, index).unwrap();
+    let tx_id_leaf = leaves.index(index);
+    let mut root = merkle_root(&tx_id_leaf, index as u32, &merkle_input.siblings);
+    root.reverse();
+    let root = hex::encode(root);
+
+    assert_eq!(root.as_str(), expected_root);
 }
